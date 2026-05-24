@@ -20,7 +20,7 @@ export const groupService = {
         groups.push({
           id: docSnapshot.id,
           ...data,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
       return groups;
@@ -43,7 +43,7 @@ export const groupService = {
         return {
           id: docSnap.id,
           ...data,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         };
       }
       return null;
@@ -85,7 +85,7 @@ export const groupService = {
       return {
         id: docRef.id,
         ...docData,
-        createdAt: docData.createdAt.toDate().toISOString()
+        createdAt: docData.createdAt && typeof docData.createdAt.toDate === 'function' ? docData.createdAt.toDate().toISOString() : docData.createdAt
       };
     } catch (error) {
       console.error("Firestore createGroup failed:", error);

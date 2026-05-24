@@ -359,7 +359,7 @@ export const GroupProvider = ({ children }) => {
         userGroups.push({
           id: docSnapshot.id,
           ...data,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
 

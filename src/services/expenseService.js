@@ -22,8 +22,8 @@ export const expenseService = {
         expenses.push({
           id: docSnapshot.id,
           ...data,
-          date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+          date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
       return expenses;
@@ -75,8 +75,8 @@ export const expenseService = {
       return {
         id: docRef.id,
         ...docData,
-        date: docData.date.toDate().toISOString(),
-        createdAt: docData.createdAt.toDate().toISOString()
+        date: docData.date && typeof docData.date.toDate === 'function' ? docData.date.toDate().toISOString() : docData.date,
+        createdAt: docData.createdAt && typeof docData.createdAt.toDate === 'function' ? docData.createdAt.toDate().toISOString() : docData.createdAt
       };
     } catch (error) {
       console.error("Firestore addExpense failed:", error);
@@ -115,7 +115,7 @@ export const expenseService = {
         activities.push({
           id: docSnapshot.id,
           ...data,
-          date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date
+          date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : data.date
         });
       });
       return activities;
@@ -148,8 +148,8 @@ export const expenseService = {
         expenses.push({
           id: docSnapshot.id,
           ...data,
-          date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt
+          date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
       return expenses;

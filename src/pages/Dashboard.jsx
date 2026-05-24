@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Users, ArrowUpRight, ArrowDownLeft, Wallet, AlertCircle } from "lucide-react";
+import { Plus, Users, ArrowUpRight, ArrowDownLeft, Wallet, AlertCircle, Trash2 } from "lucide-react";
 import { useGroups } from "../context/GroupContext";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/Avatar";
@@ -16,10 +16,22 @@ export const Dashboard = ({ onNavigateToGroup }) => {
     allExpenses, 
     globalBalance, 
     loadingGroups, 
-    refreshGlobalBalances 
+    refreshGlobalBalances,
+    deleteGroup
   } = useGroups();
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const handleDeleteGroupClick = async (e, groupId) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this group? All expenses and activities will be permanently removed.")) {
+      try {
+        await deleteGroup(groupId);
+      } catch (error) {
+        console.error("Failed to delete group:", error);
+      }
+    }
+  };
 
   if (loadingGroups) {
     return <DashboardSkeleton />;
@@ -158,11 +170,16 @@ export const Dashboard = ({ onNavigateToGroup }) => {
         <div className="flex flex-col gap-3">
           {groups.map((group) => {
             const balanceInfo = getGroupBalanceText(group);
+            const creatorMember = group.members.find(m => m.uid === group.createdBy);
+            const creatorName = creatorMember 
+              ? (creatorMember.email.toLowerCase() === currentUser?.email?.toLowerCase() ? "You" : creatorMember.name)
+              : "Unknown";
+
             return (
               <div
                 key={group.id}
                 onClick={() => onNavigateToGroup(group.id)}
-                className="p-4 rounded-2xl bg-white dark:bg-dark-card border border-slate-150/60 dark:border-dark-border/40 hover:border-emerald-500/30 hover:scale-[1.01] shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex flex-col gap-3 group"
+                className="p-4 rounded-2xl bg-white dark:bg-dark-card border border-slate-150/60 dark:border-dark-border/40 hover:border-emerald-500/30 hover:scale-[1.01] shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex flex-col gap-2.5 group"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
@@ -171,6 +188,10 @@ export const Dashboard = ({ onNavigateToGroup }) => {
                     </h4>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">
                       {group.description || "No description provided"}
+                    </p>
+                    <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                      <span>Created by:</span>
+                      <span className="font-semibold text-slate-500 dark:text-slate-400">{creatorName}</span>
                     </p>
                   </div>
                   <span className={`${balanceInfo.style} px-2.5 py-1 bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border/30 rounded-xl`}>
@@ -202,9 +223,20 @@ export const Dashboard = ({ onNavigateToGroup }) => {
                     </span>
                   </div>
 
-                  <span className="text-[9px] uppercase font-extrabold text-emerald-500 tracking-wider group-hover:translate-x-1 transition-transform">
-                    View Details →
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {group.createdBy === currentUser?.uid && (
+                      <button
+                        onClick={(e) => handleDeleteGroupClick(e, group.id)}
+                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                        title="Delete Group"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <span className="text-[9px] uppercase font-extrabold text-emerald-500 tracking-wider group-hover:translate-x-1 transition-transform">
+                      View Details →
+                    </span>
+                  </div>
                 </div>
               </div>
             );
