@@ -28,8 +28,8 @@ export const expenseService = {
       });
       return expenses;
     } catch (error) {
-      console.error("Firestore getExpenses failed, falling back to mockDb:", error);
-      return mockDb.getExpenses(groupId);
+      console.error("Firestore getExpenses failed:", error);
+      throw error;
     }
   },
 
@@ -47,7 +47,7 @@ export const expenseService = {
         createdAt: Timestamp.now()
       };
       
-      const docRef = await withTimeout(addDoc(collection(db, "expenses"), docData));
+      const docRef = await withTimeout(addDoc(collection(db, "expenses"), docData), 5000);
       
       // Log Activity in Firestore
       try {
@@ -67,7 +67,7 @@ export const expenseService = {
           text: activityText,
           groupId: expenseData.groupId,
           date: Timestamp.now()
-        }));
+        }), 5000);
       } catch (actErr) {
         console.error("Failed to log expense activity in Firestore", actErr);
       }
@@ -79,8 +79,8 @@ export const expenseService = {
         createdAt: docData.createdAt.toDate().toISOString()
       };
     } catch (error) {
-      console.error("Firestore addExpense failed, falling back to mockDb:", error);
-      return mockDb.addExpense(expenseData);
+      console.error("Firestore addExpense failed:", error);
+      throw error;
     }
   },
 
@@ -120,8 +120,8 @@ export const expenseService = {
       });
       return activities;
     } catch (error) {
-      console.error("Firestore getActivities failed, falling back to mockDb:", error);
-      return mockDb.getActivities(userEmail);
+      console.error("Firestore getActivities failed:", error);
+      throw error;
     }
   },
 
@@ -154,8 +154,8 @@ export const expenseService = {
       });
       return expenses;
     } catch (error) {
-      console.error("Firestore getAllExpenses failed, falling back to mockDb:", error);
-      return mockDb.getAllExpenses(userEmail);
+      console.error("Firestore getAllExpenses failed:", error);
+      throw error;
     }
   }
 };

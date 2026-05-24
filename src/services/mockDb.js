@@ -301,6 +301,25 @@ export const mockDb = {
     return newActivity;
   },
 
+  deleteGroup: (groupId) => {
+    initializeMockDb();
+    const groups = JSON.parse(localStorage.getItem(KEY_GROUPS) || "[]");
+    const filteredGroups = groups.filter(g => g.id !== groupId);
+    localStorage.setItem(KEY_GROUPS, JSON.stringify(filteredGroups));
+
+    // Delete related expenses
+    const expenses = JSON.parse(localStorage.getItem(KEY_EXPENSES) || "[]");
+    const filteredExpenses = expenses.filter(e => e.groupId !== groupId);
+    localStorage.setItem(KEY_EXPENSES, JSON.stringify(filteredExpenses));
+
+    // Delete related activities
+    const activities = JSON.parse(localStorage.getItem(KEY_ACTIVITIES) || "[]");
+    const filteredActivities = activities.filter(a => a.groupId !== groupId);
+    localStorage.setItem(KEY_ACTIVITIES, JSON.stringify(filteredActivities));
+
+    return true;
+  },
+
   updateUserProfile: (uid, updates) => {
     initializeMockDb();
     // Update currentUser

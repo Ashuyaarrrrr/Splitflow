@@ -1,5 +1,5 @@
 import { db, isFirebaseConfigured, withTimeout } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, arrayUnion, Timestamp, deleteDoc } from "firebase/firestore";
 import { mockDb } from "./mockDb";
 
 export const groupService = {
@@ -25,8 +25,8 @@ export const groupService = {
       });
       return groups;
     } catch (error) {
-      console.error("Firestore getGroups failed, falling back to mockDb:", error);
-      return mockDb.getGroups(userEmail);
+      console.error("Firestore getGroups failed:", error);
+      throw error;
     }
   },
 
@@ -48,8 +48,8 @@ export const groupService = {
       }
       return null;
     } catch (error) {
-      console.error("Firestore getGroup failed, falling back to mockDb:", error);
-      return mockDb.getGroup(groupId);
+      console.error("Firestore getGroup failed:", error);
+      throw error;
     }
   },
 
@@ -68,7 +68,7 @@ export const groupService = {
         createdBy: groupData.createdBy,
         createdAt: Timestamp.now()
       };
-      const docRef = await withTimeout(addDoc(collection(db, "groups"), docData));
+      const docRef = await withTimeout(addDoc(collection(db, "groups"), docData), 5000);
       
       // Log Activity in Firestore
       try {
@@ -77,7 +77,7 @@ export const groupService = {
           text: `${creator.name} created the group "${groupData.name}"`,
           groupId: docRef.id,
           date: Timestamp.now()
-        }));
+        }), 5000);
       } catch (actErr) {
         console.error("Failed to log creation activity in Firestore", actErr);
       }
@@ -88,8 +88,8 @@ export const groupService = {
         createdAt: docData.createdAt.toDate().toISOString()
       };
     } catch (error) {
-      console.error("Firestore createGroup failed, falling back to mockDb:", error);
-      return mockDb.createGroup(groupData);
+      console.error("Firestore createGroup failed:", error);
+      throw error;
     }
   },
 
@@ -118,17 +118,17 @@ export const groupService = {
       await withTimeout(updateDoc(docRef, {
         members: arrayUnion(member),
         memberEmails: arrayUnion(member.email.toLowerCase())
-      }));
+      }), 5000);
 
       // Log Activity in Firestore
       try {
-        const groupSnap = await withTimeout(getDoc(docRef));
+        const groupSnap = await withTimeout(getDoc(docRef), 5000);
         const groupName = groupSnap.exists() ? groupSnap.data().name : "";
         await withTimeout(addDoc(collection(db, "activities"), {
           text: `Added ${member.name} to "${groupName}"`,
           groupId: groupId,
           date: Timestamp.now()
-        }));
+        }), 5000);
       } catch (actErr) {
         console.error("Failed to log addMember activity in Firestore", actErr);
       }
@@ -136,7 +136,22 @@ export const groupService = {
       return true;
     } catch (error) {
       console.error("Firestore addMemberToGroup failed:", error);
-      return false;
+      throw error;
+    }
+  },
+
+  // Delete a group
+  deleteGroup: async (groupId) => {
+    if (!isFirebaseConfigured) {
+      return mockDb.deleteGroup(groupId);
+    }
+    try {
+      const docRef = doc(db, "groups", groupId);
+      await withTimeout(deleteDoc(docRef), 5000);
+      return true;
+    } catch (error) {
+      console.error("Firestore deleteGroup failed:", error);
+      throw error;
     }
   }
 };

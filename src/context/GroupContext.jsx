@@ -35,11 +35,15 @@ export const GroupProvider = ({ children }) => {
       setGroups(userGroups);
       return userGroups;
     } catch (error) {
-      console.error("Failed to load groups:", error);
+      console.error("Failed to load groups from Firestore:", error);
+      showToast("⚠️ Cloud Sync failed. Loading local data.", "warning");
+      const localGroups = mockDb.getGroups(currentUser.email);
+      setGroups(localGroups);
+      return localGroups;
     } finally {
       setLoadingGroups(false);
     }
-  }, [currentUser]);
+  }, [currentUser, showToast]);
 
   // Fetch recent activities
   const loadActivities = useCallback(async () => {
@@ -53,7 +57,9 @@ export const GroupProvider = ({ children }) => {
       );
       setActivities(recentActivities);
     } catch (error) {
-      console.error("Failed to load activities:", error);
+      console.error("Failed to load activities from Firestore:", error);
+      const localActivities = mockDb.getActivities(currentUser.email);
+      setActivities(localActivities);
     } finally {
       setLoadingActivities(false);
     }
@@ -75,7 +81,15 @@ export const GroupProvider = ({ children }) => {
         setBalances(calcResult);
       }
     } catch (error) {
-      console.error("Failed to load group details:", error);
+      console.error("Failed to load group details from Firestore:", error);
+      const groupData = mockDb.getGroup(groupId);
+      setCurrentGroup(groupData);
+      if (groupData) {
+        const groupExpenses = mockDb.getExpenses(groupId);
+        setExpenses(groupExpenses);
+        const calcResult = calculateBalances(groupData.members, groupExpenses);
+        setBalances(calcResult);
+      }
     } finally {
       setLoadingDetails(false);
     }
@@ -108,6 +122,29 @@ export const GroupProvider = ({ children }) => {
     } catch (error) {
       console.error("Create group failed:", error);
       throw error;
+    }
+  };
+
+  // Delete an existing group
+  const deleteGroup = async (groupId) => {
+    if (!currentUser) return false;
+    try {
+      const success = await groupService.deleteGroup(groupId);
+      if (success) {
+        showToast("Group deleted successfully!", "success");
+        await Promise.all([
+          loadGroups(),
+          loadActivities(),
+          refreshGlobalBalances()
+        ]);
+      } else {
+        showToast("Failed to delete group. Only the creator can delete it.", "error");
+      }
+      return success;
+    } catch (error) {
+      console.error("Delete group failed:", error);
+      showToast("Failed to delete group", "error");
+      return false;
     }
   };
 
@@ -184,7 +221,39 @@ export const GroupProvider = ({ children }) => {
         net: Math.round((youAreOwed - youOwe) * 100) / 100
       });
     } catch (error) {
-      console.error("Error refreshing global balances:", error);
+      console.error("Error refreshing global balances from Firestore:", error);
+      // Fallback to mockDb
+      const userGroups = mockDb.getGroups(currentUser.email);
+      setGroups(userGroups);
+      
+      let youOwe = 0;
+      let youAreOwed = 0;
+      const allTempExpenses = [];
+      const myEmailKey = currentUser.email.toLowerCase();
+
+      userGroups.forEach((grp) => {
+        const grpExpenses = mockDb.getExpenses(grp.id);
+        allTempExpenses.push(...grpExpenses);
+        
+        const grpBalances = calculateBalances(grp.members, grpExpenses);
+        const myBalance = grpBalances.netBalances[myEmailKey] || 0;
+        
+        if (myBalance > 0) {
+          youAreOwed += myBalance;
+        } else if (myBalance < 0) {
+          youOwe += Math.abs(myBalance);
+        }
+      });
+
+      setAllExpenses(
+        allTempExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      );
+
+      setGlobalBalance({
+        youOwe: Math.round(youOwe * 100) / 100,
+        youAreOwed: Math.round(youAreOwed * 100) / 100,
+        net: Math.round((youAreOwed - youOwe) * 100) / 100
+      });
     }
   }, [currentUser]);
 
@@ -227,8 +296,51 @@ export const GroupProvider = ({ children }) => {
     
     // Safety timer to prevent perpetual loading skeleton if Firestore is uninitialized/hanging
     const safetyTimer = setTimeout(() => {
-      setLoadingGroups(false);
+      console.warn("Firestore realtime listener timed out, falling back to mockDb");
+      fallbackToMock();
     }, 1500);
+
+    const fallbackToMock = () => {
+      try {
+        const userGroups = mockDb.getGroups(currentUser.email);
+        setGroups(userGroups);
+        const recentActivities = mockDb.getActivities(currentUser.email);
+        setActivities(recentActivities);
+        
+        let youOwe = 0;
+        let youAreOwed = 0;
+        const allTempExpenses = [];
+        const myEmailKey = currentUser.email.toLowerCase();
+
+        userGroups.forEach((grp) => {
+          const grpExpenses = mockDb.getExpenses(grp.id);
+          allTempExpenses.push(...grpExpenses);
+          
+          const grpBalances = calculateBalances(grp.members, grpExpenses);
+          const myBalance = grpBalances.netBalances[myEmailKey] || 0;
+          
+          if (myBalance > 0) {
+            youAreOwed += myBalance;
+          } else if (myBalance < 0) {
+            youOwe += Math.abs(myBalance);
+          }
+        });
+
+        setAllExpenses(
+          allTempExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        );
+
+        setGlobalBalance({
+          youOwe: Math.round(youOwe * 100) / 100,
+          youAreOwed: Math.round(youAreOwed * 100) / 100,
+          net: Math.round((youAreOwed - youOwe) * 100) / 100
+        });
+      } catch (err) {
+        console.error("Fallback to mockDb failed:", err);
+      } finally {
+        setLoadingGroups(false);
+      }
+    };
 
     // 1. Fetch activities on mount
     loadActivities();
@@ -274,7 +386,8 @@ export const GroupProvider = ({ children }) => {
     }, (error) => {
       clearTimeout(safetyTimer);
       console.error("Realtime groups snapshot failed:", error);
-      setLoadingGroups(false);
+      showToast("⚠️ Cloud Sync failed. Running in offline sandbox mode.", "warning");
+      fallbackToMock();
     });
 
     return () => {
@@ -299,6 +412,7 @@ export const GroupProvider = ({ children }) => {
     loadActivities,
     loadGroupDetails,
     createGroup,
+    deleteGroup,
     addExpense,
     refreshGlobalBalances
   };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Plus, DollarSign, HandCoins, ListFilter, TrendingUp, Info, User, Check, Pizza, Car, Lightbulb, Home, Clapperboard, ShoppingBag, CreditCard, Calendar } from "lucide-react";
+import { ArrowLeft, Plus, DollarSign, HandCoins, ListFilter, TrendingUp, Info, User, Check, Pizza, Car, Lightbulb, Home, Clapperboard, ShoppingBag, CreditCard, Calendar, Trash2 } from "lucide-react";
 import { useGroups } from "../context/GroupContext";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/Avatar";
@@ -25,7 +25,8 @@ export const GroupDetails = ({ groupId, onBack }) => {
     expenses, 
     balances, 
     loadingDetails, 
-    loadGroupDetails 
+    loadGroupDetails,
+    deleteGroup
   } = useGroups();
 
   const [activeTab, setActiveTab] = useState("expenses"); // expenses | balances
@@ -42,6 +43,19 @@ export const GroupDetails = ({ groupId, onBack }) => {
       loadGroupDetails(groupId);
     }
   }, [groupId, loadGroupDetails]);
+
+  const handleDeleteGroup = async () => {
+    if (window.confirm("Are you sure you want to delete this group? All expenses and activities will be permanently removed.")) {
+      try {
+        const success = await deleteGroup(currentGroup.id);
+        if (success) {
+          onBack();
+        }
+      } catch (error) {
+        console.error("Failed to delete group:", error);
+      }
+    }
+  };
 
   if (loadingDetails || !currentGroup) {
     return <GroupSkeleton />;
@@ -110,9 +124,20 @@ export const GroupDetails = ({ groupId, onBack }) => {
               {currentGroup.description || "No description provided"}
             </p>
           </div>
-          <span className="text-[10px] text-slate-400 font-bold bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border/40 rounded-lg px-2 py-1">
-            {currentGroup.members.length} members
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 font-bold bg-slate-50 dark:bg-dark-bg border border-slate-100 dark:border-dark-border/40 rounded-lg px-2 py-1">
+              {currentGroup.members.length} members
+            </span>
+            {currentGroup.createdBy === currentUser?.uid && (
+              <button
+                onClick={handleDeleteGroup}
+                className="p-1.5 text-slate-450 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                title="Delete Group"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Group balance banner */}
