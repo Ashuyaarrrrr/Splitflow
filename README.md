@@ -176,31 +176,22 @@ Inside [balanceCalculator.js](file:///c:/Users/Ashu/Desktop/codes/SplitFlow/src/
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
----
-
 ## 📱 Mobile Installation (PWA Guide)
 
-Since SplitFlow is a fully configured Progressive Web App, you can install it directly onto your mobile phone to use it like a native app.
+SplitFlow is a fully optimized Progressive Web App (PWA). You can access and install the official app directly on your smartphone by visiting:
 
-### Installation Instructions
+**Official App Link**: [https://splitflow-three.vercel.app/](https://splitflow-three.vercel.app/)
 
-#### On Android (Chrome / Edge):
-1. Open your deployed URL (e.g., `https://your-app.vercel.app`) in the browser.
-2. Tap the browser notify banner: **"Add SplitFlow to Home Screen"** or select **Install App / Add to Home screen** from the browser's three-dot settings menu.
-3. Tap **Install**. The SplitFlow icon will now appear on your home screen and app drawer.
+### How to Install the App on Your Phone
 
-#### On iOS (Safari):
-1. Open the deployed URL in Safari.
-2. Tap the **Share** button (box with an arrow pointing up) in the bottom navigation bar.
-3. Scroll down the sharing menu and select **"Add to Home Screen"**.
-4. Confirm by tapping **Add** in the top-right corner. The SplitFlow icon will appear on your iPhone home screen.
+#### On Android (Google Chrome / Microsoft Edge):
+1. Open the [Official App Link](https://splitflow-three.vercel.app/) in Chrome or Edge.
+2. Tap the bottom banner that says **"Add SplitFlow to Home Screen"**.
+3. If the banner doesn't appear, tap the browser's **three-dot menu** in the top-right corner and select **Install App** or **Add to Home screen**.
+4. Confirm the installation. The SplitFlow icon will be added to your home screen and app drawer, running as a borderless standalone app.
 
----
-
-## 📦 Production Build
-
-To compile and minify the frontend assets for production:
-```powershell
-npm run build
-```
-Vite will output the compiled build in the `/dist` directory. This directory is ready to be deployed to static hosting platforms like Vercel, Firebase Hosting, or Netlify.
+#### On iOS (Apple Safari):
+1. Open the [Official App Link](https://splitflow-three.vercel.app/) in Safari.
+2. Tap the **Share** icon (a square with an arrow pointing upwards) in the bottom navigation bar.
+3. Scroll down the options list and select **"Add to Home Screen"**.
+4. Tap **Add** in the top-right corner. The SplitFlow icon will appear on your iOS home screen, launched without any browser tabs or URL bars.
