@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://api.dicebear.com/7.x/identicon/svg?seed=splitflow&backgroundColor=10b981" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#10B981" />
+    <meta name="description" content="SplitFlow - A premium mobile-first bill splitter web application. Split expenses, track shared balances, simplify debts, and manually settle up with friends offline." />
+    
+    <!-- Apple PWA specific tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SplitFlow" />
+    <link rel="apple-touch-icon" href="https://api.dicebear.com/7.x/identicon/png?seed=splitflow&backgroundColor=10b981" />
+    
+    <link rel="manifest" href="/manifest.json" />
+    <title>SplitFlow - Split Expenses & Bills Seamlessly</title>
+    
+    <!-- Inline script to prevent theme flash -->
+    <script>
+      (function() {
+        const savedTheme = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      })();
+    </script>
+  </head>
+  <body class="select-none">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
