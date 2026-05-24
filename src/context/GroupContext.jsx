@@ -6,6 +6,7 @@ import { calculateBalances } from "../utils/balanceCalculator";
 import { db, isFirebaseConfigured } from "../services/firebase";
 import { collection, query, where, Timestamp, onSnapshot } from "firebase/firestore";
 import { useToast } from "../components/Toast";
+import { mockDb } from "../services/mockDb";
 
 const GroupContext = createContext();
 
@@ -13,7 +14,15 @@ export const useGroups = () => useContext(GroupContext);
 
 export const GroupProvider = ({ children }) => {
   const { currentUser } = useAuth();
-  const { showToast } = useToast();
+  const toastContext = useToast();
+  const showToast = useCallback((msg, type) => {
+    if (toastContext && typeof toastContext.showToast === 'function') {
+      toastContext.showToast(msg, type);
+    } else {
+      console.log(`[Toast - ${type}]: ${msg}`);
+    }
+  }, [toastContext]);
+  
   const [groups, setGroups] = useState([]);
   const [currentGroup, setCurrentGroup] = useState(null);
   const [expenses, setExpenses] = useState([]); // Expenses of current group
@@ -28,7 +37,7 @@ export const GroupProvider = ({ children }) => {
 
   // Fetch groups list
   const loadGroups = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) return [];
     setLoadingGroups(true);
     try {
       const userGroups = await groupService.getGroups(currentUser.email);
@@ -47,10 +56,10 @@ export const GroupProvider = ({ children }) => {
 
   // Fetch recent activities
   const loadActivities = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) return;
     setLoadingActivities(true);
     try {
-      const activeGroupIds = groups.map(g => g.id);
+      const activeGroupIds = (groups || []).map(g => g.id);
       const recentActivities = await expenseService.getActivities(
         currentUser.email,
         activeGroupIds.length > 0 ? activeGroupIds : null
@@ -77,7 +86,7 @@ export const GroupProvider = ({ children }) => {
         setExpenses(groupExpenses);
 
         // Calculate balances
-        const calcResult = calculateBalances(groupData.members, groupExpenses);
+        const calcResult = calculateBalances(groupData.members || [], groupExpenses);
         setBalances(calcResult);
       }
     } catch (error) {
@@ -87,7 +96,7 @@ export const GroupProvider = ({ children }) => {
       if (groupData) {
         const groupExpenses = mockDb.getExpenses(groupId);
         setExpenses(groupExpenses);
-        const calcResult = calculateBalances(groupData.members, groupExpenses);
+        const calcResult = calculateBalances(groupData.members || [], groupExpenses);
         setBalances(calcResult);
       }
     } finally {
@@ -97,27 +106,54 @@ export const GroupProvider = ({ children }) => {
 
   // Create a new group
   const createGroup = async (name, description, members) => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) {
+      showToast("You must be logged in with a valid email to create a group", "error");
+      throw new Error("User email is not available");
+    }
     try {
       // Ensure current user is part of the members
       const formattedMembers = [...members];
-      if (!formattedMembers.some(m => m.email.toLowerCase() === currentUser.email.toLowerCase())) {
+      const currentUserIndex = formattedMembers.findIndex(m => m.email.toLowerCase() === currentUser.email.toLowerCase());
+      if (currentUserIndex === -1) {
         formattedMembers.push({
           email: currentUser.email,
-          name: currentUser.displayName,
+          name: currentUser.displayName || currentUser.email.split("@")[0],
           uid: currentUser.uid
         });
+      } else {
+        formattedMembers[currentUserIndex] = {
+          ...formattedMembers[currentUserIndex],
+          uid: currentUser.uid
+        };
       }
 
       const newGroup = await groupService.createGroup({
         name,
         description,
         members: formattedMembers,
-        createdBy: currentUser.uid
+        createdBy: currentUser.uid,
+        createdByName: currentUser.displayName || currentUser.email.split("@")[0]
       });
 
-      await loadGroups();
-      await loadActivities();
+      // Run background updates safely inside a decoupled event loop tick
+      setTimeout(async () => {
+        try {
+          await loadGroups();
+        } catch (err) {
+          console.error("Background loadGroups failed:", err);
+        }
+        try {
+          await loadActivities();
+        } catch (err) {
+          console.error("Background loadActivities failed:", err);
+        }
+        try {
+          await refreshGlobalBalances();
+        } catch (err) {
+          console.error("Background refreshGlobalBalances failed:", err);
+        }
+      }, 0);
+
       return newGroup;
     } catch (error) {
       console.error("Create group failed:", error);
@@ -127,16 +163,32 @@ export const GroupProvider = ({ children }) => {
 
   // Delete an existing group
   const deleteGroup = async (groupId) => {
-    if (!currentUser) return false;
+    if (!currentUser || !currentUser.email) {
+      showToast("You must be logged in to delete a group", "error");
+      return false;
+    }
     try {
       const success = await groupService.deleteGroup(groupId);
       if (success) {
         showToast("Group deleted successfully!", "success");
-        await Promise.all([
-          loadGroups(),
-          loadActivities(),
-          refreshGlobalBalances()
-        ]);
+        // Run background updates safely inside a decoupled event loop tick
+        setTimeout(async () => {
+          try {
+            await loadGroups();
+          } catch (err) {
+            console.error("Background loadGroups failed:", err);
+          }
+          try {
+            await loadActivities();
+          } catch (err) {
+            console.error("Background loadActivities failed:", err);
+          }
+          try {
+            await refreshGlobalBalances();
+          } catch (err) {
+            console.error("Background refreshGlobalBalances failed:", err);
+          }
+        }, 0);
       } else {
         showToast("Failed to delete group. Only the creator can delete it.", "error");
       }
@@ -154,17 +206,26 @@ export const GroupProvider = ({ children }) => {
     try {
       const response = await expenseService.addExpense(expenseData);
       
-      // Refresh current group if viewing it
-      const refreshGroupDetails = (currentGroup && currentGroup.id === expenseData.groupId)
-        ? loadGroupDetails(currentGroup.id)
-        : Promise.resolve();
-      
-      // Refresh global states in parallel
-      await Promise.all([
-        refreshGroupDetails,
-        loadActivities(),
-        refreshGlobalBalances()
-      ]);
+      // Run background updates safely inside a decoupled event loop tick
+      setTimeout(async () => {
+        try {
+          if (currentGroup && currentGroup.id === expenseData.groupId) {
+            await loadGroupDetails(currentGroup.id);
+          }
+        } catch (err) {
+          console.error("Background loadGroupDetails failed:", err);
+        }
+        try {
+          await loadActivities();
+        } catch (err) {
+          console.error("Background loadActivities failed:", err);
+        }
+        try {
+          await refreshGlobalBalances();
+        } catch (err) {
+          console.error("Background refreshGlobalBalances failed:", err);
+        }
+      }, 0);
       
       return response;
     } catch (error) {
@@ -175,13 +236,13 @@ export const GroupProvider = ({ children }) => {
 
   // Calculate global totals for Dashboard using parallel fetches
   const refreshGlobalBalances = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) return;
     try {
       // Step 1: Fetch groups list
       const userGroups = await groupService.getGroups(currentUser.email);
       setGroups(userGroups);
       
-      if (userGroups.length === 0) {
+      if (!userGroups || userGroups.length === 0) {
         setAllExpenses([]);
         setGlobalBalance({ youOwe: 0, youAreOwed: 0, net: 0 });
         return;
@@ -189,7 +250,7 @@ export const GroupProvider = ({ children }) => {
 
       // Step 2: Fetch expenses for all groups in parallel
       const allExpensesDocs = await Promise.all(
-        userGroups.map(grp => expenseService.getExpenses(grp.id))
+        userGroups.map(grp => expenseService.getExpenses(grp.id).catch(() => []))
       );
 
       let youOwe = 0;
@@ -201,7 +262,8 @@ export const GroupProvider = ({ children }) => {
         const grpExpenses = allExpensesDocs[idx] || [];
         allTempExpenses.push(...grpExpenses);
         
-        const grpBalances = calculateBalances(grp.members, grpExpenses);
+        const grpMembers = grp.members || [];
+        const grpBalances = calculateBalances(grpMembers, grpExpenses);
         const myBalance = grpBalances.netBalances[myEmailKey] || 0;
         
         if (myBalance > 0) {
@@ -222,8 +284,9 @@ export const GroupProvider = ({ children }) => {
       });
     } catch (error) {
       console.error("Error refreshing global balances from Firestore:", error);
+      if (!currentUser || !currentUser.email) return;
       // Fallback to mockDb
-      const userGroups = mockDb.getGroups(currentUser.email);
+      const userGroups = mockDb.getGroups(currentUser.email) || [];
       setGroups(userGroups);
       
       let youOwe = 0;
@@ -232,10 +295,11 @@ export const GroupProvider = ({ children }) => {
       const myEmailKey = currentUser.email.toLowerCase();
 
       userGroups.forEach((grp) => {
-        const grpExpenses = mockDb.getExpenses(grp.id);
+        const grpExpenses = mockDb.getExpenses(grp.id) || [];
         allTempExpenses.push(...grpExpenses);
         
-        const grpBalances = calculateBalances(grp.members, grpExpenses);
+        const grpMembers = grp.members || [];
+        const grpBalances = calculateBalances(grpMembers, grpExpenses);
         const myBalance = grpBalances.netBalances[myEmailKey] || 0;
         
         if (myBalance > 0) {
@@ -259,7 +323,7 @@ export const GroupProvider = ({ children }) => {
 
   // Sync groups & activities on auth state change (real-time listener)
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !currentUser.email) {
       setGroups([]);
       setCurrentGroup(null);
       setExpenses([]);
@@ -301,10 +365,11 @@ export const GroupProvider = ({ children }) => {
     }, 1500);
 
     const fallbackToMock = () => {
+      if (!currentUser || !currentUser.email) return;
       try {
-        const userGroups = mockDb.getGroups(currentUser.email);
+        const userGroups = mockDb.getGroups(currentUser.email) || [];
         setGroups(userGroups);
-        const recentActivities = mockDb.getActivities(currentUser.email);
+        const recentActivities = mockDb.getActivities(currentUser.email) || [];
         setActivities(recentActivities);
         
         let youOwe = 0;
@@ -313,10 +378,11 @@ export const GroupProvider = ({ children }) => {
         const myEmailKey = currentUser.email.toLowerCase();
 
         userGroups.forEach((grp) => {
-          const grpExpenses = mockDb.getExpenses(grp.id);
+          const grpExpenses = mockDb.getExpenses(grp.id) || [];
           allTempExpenses.push(...grpExpenses);
           
-          const grpBalances = calculateBalances(grp.members, grpExpenses);
+          const grpMembers = grp.members || [];
+          const grpBalances = calculateBalances(grpMembers, grpExpenses);
           const myBalance = grpBalances.netBalances[myEmailKey] || 0;
           
           if (myBalance > 0) {
@@ -395,7 +461,7 @@ export const GroupProvider = ({ children }) => {
       unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, currentUser?.email]);
 
   const value = {
     groups,

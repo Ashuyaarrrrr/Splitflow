@@ -199,13 +199,14 @@ export const mockDb = {
     initializeMockDb();
     const groups = JSON.parse(localStorage.getItem(KEY_GROUPS) || "[]");
     // Return groups where member email matches
-    return groups.filter(g => g.members.some(m => m.email.toLowerCase() === email.toLowerCase()));
+    if (!email) return [];
+    return groups.filter(g => g && g.members && Array.isArray(g.members) && g.members.some(m => m && m.email && m.email.toLowerCase() === email.toLowerCase()));
   },
 
   getGroup: (groupId) => {
     initializeMockDb();
     const groups = JSON.parse(localStorage.getItem(KEY_GROUPS) || "[]");
-    return groups.find(g => g.id === groupId) || null;
+    return groups.find(g => g && g.id === groupId) || null;
   },
 
   createGroup: (group) => {
@@ -220,8 +221,10 @@ export const mockDb = {
     localStorage.setItem(KEY_GROUPS, JSON.stringify(groups));
 
     // Log Activity
-    const creator = group.members.find(m => m.uid === group.createdBy) || { name: "Someone" };
-    mockDb.addActivity(`${creator.name} created the group "${group.name}"`, newGroup.id);
+    const creator = (group.members && Array.isArray(group.members)) 
+      ? (group.members.find(m => m && m.uid === group.createdBy) || { name: "Someone" }) 
+      : { name: "Someone" };
+    mockDb.addActivity(`${creator.name || "Someone"} created the group "${group.name}"`, newGroup.id);
 
     return newGroup;
   },

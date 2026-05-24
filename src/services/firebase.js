@@ -39,7 +39,7 @@ if (isFirebaseConfigured) {
 export { auth, db, googleProvider, isFirebaseConfigured };
 
 // Utility to wrap Firebase promises in a timeout to prevent hanging on network/initialization issues
-export const withTimeout = (promise, ms = 1200) => {
+export const withTimeout = (promise, ms = 15000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase operation timed out")), ms))

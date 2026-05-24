@@ -55,7 +55,7 @@ export const groupService = {
 
   // Create a new group
   createGroup: async (groupData) => {
-    // groupData: { name, description, members: [{email, name, uid}], createdBy }
+    // groupData: { name, description, members: [{email, name, uid}], createdBy, createdByName }
     if (!isFirebaseConfigured) {
       return mockDb.createGroup(groupData);
     }
@@ -66,9 +66,10 @@ export const groupService = {
         members: groupData.members,
         memberEmails: groupData.members.map(m => m.email.toLowerCase()),
         createdBy: groupData.createdBy,
+        createdByName: groupData.createdByName || "",
         createdAt: Timestamp.now()
       };
-      const docRef = await withTimeout(addDoc(collection(db, "groups"), docData), 5000);
+      const docRef = await withTimeout(addDoc(collection(db, "groups"), docData), 15000);
       
       // Log Activity in Firestore
       try {
@@ -77,7 +78,7 @@ export const groupService = {
           text: `${creator.name} created the group "${groupData.name}"`,
           groupId: docRef.id,
           date: Timestamp.now()
-        }), 5000);
+        }), 15000);
       } catch (actErr) {
         console.error("Failed to log creation activity in Firestore", actErr);
       }
@@ -118,17 +119,17 @@ export const groupService = {
       await withTimeout(updateDoc(docRef, {
         members: arrayUnion(member),
         memberEmails: arrayUnion(member.email.toLowerCase())
-      }), 5000);
+      }), 15000);
 
       // Log Activity in Firestore
       try {
-        const groupSnap = await withTimeout(getDoc(docRef), 5000);
+        const groupSnap = await withTimeout(getDoc(docRef), 15000);
         const groupName = groupSnap.exists() ? groupSnap.data().name : "";
         await withTimeout(addDoc(collection(db, "activities"), {
           text: `Added ${member.name} to "${groupName}"`,
           groupId: groupId,
           date: Timestamp.now()
-        }), 5000);
+        }), 15000);
       } catch (actErr) {
         console.error("Failed to log addMember activity in Firestore", actErr);
       }
@@ -147,7 +148,7 @@ export const groupService = {
     }
     try {
       const docRef = doc(db, "groups", groupId);
-      await withTimeout(deleteDoc(docRef), 5000);
+      await withTimeout(deleteDoc(docRef), 15000);
       return true;
     } catch (error) {
       console.error("Firestore deleteGroup failed:", error);

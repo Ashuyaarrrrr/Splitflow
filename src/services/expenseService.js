@@ -47,7 +47,7 @@ export const expenseService = {
         createdAt: Timestamp.now()
       };
       
-      const docRef = await withTimeout(addDoc(collection(db, "expenses"), docData), 5000);
+      const docRef = await withTimeout(addDoc(collection(db, "expenses"), docData), 15000);
       
       // Log Activity in Firestore
       try {
@@ -67,7 +67,7 @@ export const expenseService = {
           text: activityText,
           groupId: expenseData.groupId,
           date: Timestamp.now()
-        }), 5000);
+        }), 15000);
       } catch (actErr) {
         console.error("Failed to log expense activity in Firestore", actErr);
       }

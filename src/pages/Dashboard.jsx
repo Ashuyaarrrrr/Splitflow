@@ -171,9 +171,9 @@ export const Dashboard = ({ onNavigateToGroup }) => {
           {groups.map((group) => {
             const balanceInfo = getGroupBalanceText(group);
             const creatorMember = group.members.find(m => m.uid === group.createdBy);
-            const creatorName = creatorMember 
-              ? (creatorMember.email.toLowerCase() === currentUser?.email?.toLowerCase() ? "You" : creatorMember.name)
-              : "Unknown";
+            const creatorName = group.createdBy === currentUser?.uid
+              ? "You"
+              : (group.createdByName || creatorMember?.name || "Unknown");
 
             return (
               <div
