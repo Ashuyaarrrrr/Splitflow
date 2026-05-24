@@ -4,7 +4,6 @@ import { mockDb } from "./mockDb";
 import { groupService } from "./groupService";
 
 export const expenseService = {
-  // Get expenses for a group
   getExpenses: async (groupId) => {
     if (!isFirebaseConfigured) {
       return mockDb.getExpenses(groupId);
@@ -12,8 +11,7 @@ export const expenseService = {
     try {
       const q = query(
         collection(db, "expenses"),
-        where("groupId", "==", groupId),
-        orderBy("date", "desc")
+        where("groupId", "==", groupId)
       );
       const querySnapshot = await withTimeout(getDocs(q));
       const expenses = [];
@@ -26,6 +24,8 @@ export const expenseService = {
           createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
+      // Sort in-memory to prevent composite index requirement in Firestore
+      expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return expenses;
     } catch (error) {
       console.error("Firestore getExpenses failed:", error);
@@ -84,7 +84,6 @@ export const expenseService = {
     }
   },
 
-  // Get recent activities for groups user is member of
   getActivities: async (userEmail, preloadedGroupIds = null) => {
     if (!isFirebaseConfigured) {
       return mockDb.getActivities(userEmail);
@@ -103,9 +102,7 @@ export const expenseService = {
       // Firestore IN query supports up to 30 items
       const q = query(
         collection(db, "activities"),
-        where("groupId", "in", groupIds.slice(0, 30)),
-        orderBy("date", "desc"),
-        limit(50)
+        where("groupId", "in", groupIds.slice(0, 30))
       );
       
       const querySnapshot = await withTimeout(getDocs(q));
@@ -118,14 +115,15 @@ export const expenseService = {
           date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : data.date
         });
       });
-      return activities;
+      // Sort and slice in-memory to prevent composite index requirement in Firestore
+      activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return activities.slice(0, 50);
     } catch (error) {
       console.error("Firestore getActivities failed:", error);
       throw error;
     }
   },
 
-  // Fetch recent expenses across all groups the user belongs to
   getAllExpenses: async (userEmail) => {
     if (!isFirebaseConfigured) {
       return mockDb.getAllExpenses(userEmail);
@@ -137,8 +135,7 @@ export const expenseService = {
       
       const q = query(
         collection(db, "expenses"),
-        where("groupId", "in", groupIds.slice(0, 30)),
-        orderBy("date", "desc")
+        where("groupId", "in", groupIds.slice(0, 30))
       );
       
       const querySnapshot = await withTimeout(getDocs(q));
@@ -152,6 +149,8 @@ export const expenseService = {
           createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
         });
       });
+      // Sort in-memory to prevent composite index requirement in Firestore
+      expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return expenses;
     } catch (error) {
       console.error("Firestore getAllExpenses failed:", error);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { groupService } from "../services/groupService";
 import { expenseService } from "../services/expenseService";
@@ -77,31 +77,46 @@ export const GroupProvider = ({ children }) => {
   // Fetch details of a selected group (expenses + info)
   const loadGroupDetails = useCallback(async (groupId) => {
     setLoadingDetails(true);
+    let loadedFromFirestore = false;
     try {
       const groupData = await groupService.getGroup(groupId);
-      setCurrentGroup(groupData);
-
       if (groupData) {
-        const groupExpenses = await expenseService.getExpenses(groupId);
-        setExpenses(groupExpenses);
+        setCurrentGroup(groupData);
+        loadedFromFirestore = true;
 
-        // Calculate balances
+        let groupExpenses = [];
+        try {
+          groupExpenses = await expenseService.getExpenses(groupId);
+        } catch (expError) {
+          console.error("Failed to load group expenses from Firestore:", expError);
+          // Try mockDb fallback for expenses
+          groupExpenses = mockDb.getExpenses(groupId) || [];
+        }
+
+        setExpenses(groupExpenses);
         const calcResult = calculateBalances(groupData.members || [], groupExpenses);
         setBalances(calcResult);
       }
     } catch (error) {
       console.error("Failed to load group details from Firestore:", error);
-      const groupData = mockDb.getGroup(groupId);
-      setCurrentGroup(groupData);
-      if (groupData) {
-        const groupExpenses = mockDb.getExpenses(groupId);
-        setExpenses(groupExpenses);
-        const calcResult = calculateBalances(groupData.members || [], groupExpenses);
-        setBalances(calcResult);
-      }
-    } finally {
-      setLoadingDetails(false);
     }
+
+    // Fallback completely to MockDb only if Firestore didn't return any group data
+    if (!loadedFromFirestore) {
+      try {
+        const groupData = mockDb.getGroup(groupId);
+        setCurrentGroup(groupData);
+        if (groupData) {
+          const groupExpenses = mockDb.getExpenses(groupId) || [];
+          setExpenses(groupExpenses);
+          const calcResult = calculateBalances(groupData.members || [], groupExpenses);
+          setBalances(calcResult);
+        }
+      } catch (fallbackError) {
+        console.error("MockDb fallback also failed:", fallbackError);
+      }
+    }
+    setLoadingDetails(false);
   }, []);
 
   // Create a new group
@@ -462,6 +477,86 @@ export const GroupProvider = ({ children }) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, currentUser?.email]);
+
+  const currentGroupRef = useRef(null);
+  useEffect(() => {
+    currentGroupRef.current = currentGroup;
+  }, [currentGroup]);
+
+  // Real-time listener for expenses to update balances reactively for all group members
+  useEffect(() => {
+    if (!currentUser || !currentUser.email || !isFirebaseConfigured) {
+      return;
+    }
+
+    if (groups.length === 0) {
+      setAllExpenses([]);
+      setGlobalBalance({ youOwe: 0, youAreOwed: 0, net: 0 });
+      return;
+    }
+
+    const groupIds = groups.map(g => g.id);
+    // Firestore IN query supports up to 30 items
+    const q = query(
+      collection(db, "expenses"),
+      where("groupId", "in", groupIds.slice(0, 30))
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const tempExpenses = [];
+      querySnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        tempExpenses.push({
+          id: docSnapshot.id,
+          ...data,
+          date: data.date && typeof data.date.toDate === 'function' ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' ? data.createdAt.toDate().toISOString() : data.createdAt
+        });
+      });
+
+      // Sort in-memory
+      tempExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setAllExpenses(tempExpenses);
+
+      // Reactively sync current group expenses if open
+      const activeGroup = currentGroupRef.current;
+      if (activeGroup) {
+        const groupExpenses = tempExpenses.filter(e => e.groupId === activeGroup.id);
+        setExpenses(groupExpenses);
+        const calcResult = calculateBalances(activeGroup.members || [], groupExpenses);
+        setBalances(calcResult);
+      }
+
+      // Calculate global balances reactively
+      let youOwe = 0;
+      let youAreOwed = 0;
+      const myEmailKey = currentUser.email.toLowerCase();
+
+      groups.forEach((grp) => {
+        const grpExpenses = tempExpenses.filter(e => e.groupId === grp.id);
+        const grpBalances = calculateBalances(grp.members || [], grpExpenses);
+        const myBalance = grpBalances.netBalances[myEmailKey] || 0;
+        
+        if (myBalance > 0) {
+          youAreOwed += myBalance;
+        } else if (myBalance < 0) {
+          youOwe += Math.abs(myBalance);
+        }
+      });
+
+      setGlobalBalance({
+        youOwe: Math.round(youOwe * 100) / 100,
+        youAreOwed: Math.round(youAreOwed * 100) / 100,
+        net: Math.round((youAreOwed - youOwe) * 100) / 100
+      });
+    }, (error) => {
+      console.error("Realtime expenses snapshot failed:", error);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser?.email, groups, currentUser?.uid]);
 
   const value = {
     groups,

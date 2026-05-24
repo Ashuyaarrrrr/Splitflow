@@ -7,51 +7,73 @@ export const calculateBalances = (members = [], expenses = []) => {
   const memberMap = {};
 
   // Initialize members mapping and balance tables
-  members.forEach(member => {
-    const emailKey = member.email.toLowerCase();
-    netBalances[emailKey] = 0;
-    memberMap[emailKey] = member;
-  });
+  if (Array.isArray(members)) {
+    members.forEach(member => {
+      if (!member || !member.email) return;
+      const emailKey = member.email.toLowerCase();
+      netBalances[emailKey] = 0;
+      memberMap[emailKey] = member;
+    });
+  }
 
   // Calculate net balances based on expenses and settlements
-  expenses.forEach(exp => {
-    const amount = parseFloat(exp.amount) || 0;
-    const paidBy = exp.paidBy.toLowerCase();
+  if (Array.isArray(expenses)) {
+    expenses.forEach(exp => {
+      if (!exp || !exp.paidBy) return;
+      const amount = parseFloat(exp.amount) || 0;
+      const paidBy = exp.paidBy.toLowerCase();
 
-    if (exp.isSettlement) {
-      const receiver = exp.settlementReceiver?.toLowerCase();
-      if (!receiver) return;
+      if (exp.isSettlement) {
+        const receiver = exp.settlementReceiver ? exp.settlementReceiver.toLowerCase() : "";
+        if (!receiver) return;
 
-      // Settlement: paidBy (sender) paid receiver.
-      // Payer is credited (reduces debt / increases credit)
-      if (netBalances[paidBy] !== undefined) {
-        netBalances[paidBy] += amount;
-      }
-      // Receiver is debited (reduces credit / increases debt)
-      if (netBalances[receiver] !== undefined) {
-        netBalances[receiver] -= amount;
-      }
-    } else {
-      // Normal Expense
-      const splitAmong = exp.splitAmong || [];
-      if (splitAmong.length === 0) return;
-
-      const splitShare = amount / splitAmong.length;
-
-      // Credit the payer
-      if (netBalances[paidBy] !== undefined) {
-        netBalances[paidBy] += amount;
-      }
-
-      // Debit all split participants
-      splitAmong.forEach(email => {
-        const emailKey = email.toLowerCase();
-        if (netBalances[emailKey] !== undefined) {
-          netBalances[emailKey] -= splitShare;
+        // Settlement: paidBy (sender) paid receiver.
+        // Payer is credited (reduces debt / increases credit)
+        if (netBalances[paidBy] !== undefined) {
+          netBalances[paidBy] += amount;
         }
-      });
-    }
-  });
+        // Receiver is debited (reduces credit / increases debt)
+        if (netBalances[receiver] !== undefined) {
+          netBalances[receiver] -= amount;
+        }
+      } else {
+        // Normal Expense
+        const splitType = exp.splitType || "equal";
+
+        // Credit the payer
+        if (netBalances[paidBy] !== undefined) {
+          netBalances[paidBy] += amount;
+        }
+
+        if (splitType === "custom" && exp.splitDetails) {
+          // Custom Split
+          Object.entries(exp.splitDetails).forEach(([email, customAmount]) => {
+            if (!email) return;
+            const emailKey = email.toLowerCase();
+            const customShare = parseFloat(customAmount) || 0;
+            if (netBalances[emailKey] !== undefined) {
+              netBalances[emailKey] -= customShare;
+            }
+          });
+        } else {
+          // Equal Split (default)
+          const splitAmong = exp.splitAmong || [];
+          if (splitAmong.length === 0) return;
+
+          const splitShare = amount / splitAmong.length;
+
+          // Debit all split participants
+          splitAmong.forEach(email => {
+            if (!email) return;
+            const emailKey = email.toLowerCase();
+            if (netBalances[emailKey] !== undefined) {
+              netBalances[emailKey] -= splitShare;
+            }
+          });
+        }
+      }
+    });
+  }
 
   // Partition members into debtors (< 0) and creditors (> 0)
   const creditors = [];

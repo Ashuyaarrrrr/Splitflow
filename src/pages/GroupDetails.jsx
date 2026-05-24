@@ -57,8 +57,26 @@ export const GroupDetails = ({ groupId, onBack }) => {
     }
   };
 
-  if (loadingDetails || !currentGroup) {
+  if (loadingDetails) {
     return <GroupSkeleton />;
+  }
+
+  if (!currentGroup) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-slate-50 dark:bg-dark-bg p-6 text-center">
+        <div className="text-rose-550 dark:text-rose-400 mb-2 font-black text-sm uppercase tracking-wider">Group Not Found</div>
+        <p className="text-slate-400 dark:text-slate-500 text-[11px] mb-6 max-w-[240px] leading-relaxed">
+          The group you are trying to access does not exist or you do not have permission to view it.
+        </p>
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Dashboard</span>
+        </button>
+      </div>
+    );
   }
 
   // Calculate category spending percentages
@@ -259,8 +277,8 @@ export const GroupDetails = ({ groupId, onBack }) => {
                         ₹{Math.round(cost)}
                       </span>
                       {expense.splitAmong && (
-                        <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">
-                          split among {expense.splitAmong.length}
+                        <span className="text-[8px] font-bold text-slate-450 dark:text-slate-500 mt-0.5">
+                          {expense.splitType === "custom" ? "custom split" : `split among ${expense.splitAmong.length}`}
                         </span>
                       )}
                     </div>

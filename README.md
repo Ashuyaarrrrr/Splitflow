@@ -9,6 +9,7 @@ SplitFlow is a premium, mobile-first, full-stack Progressive Web Application (PW
 * **Fintech Glassmorphic UI**: Tailored color palettes, sleek dark modes, linear gradients, and micro-animations built using Vanilla CSS.
 * **Real-time Cloud Syncing**: Instant synchronization of groups, expenses, and activity logs across members using Cloud Firestore.
 * **Intelligent Offline Sandbox Fallback**: Automatic detection of poor network connectivity or unconfigured databases. The app seamlessly degrades to a client-side localStorage mock database (`mockDb`) within 1.5 seconds, ensuring the UI never freezes.
+* **Advanced Expense Splitting**: Supports splitting bills dynamically among selected group members, with support for **Split Equally** (with real-time share previews) and **Custom Dutch Splits** (with sum matching validation, remaining balance calculators, and button safeguards).
 * **Smart Balance Simplification**: Computes net balances for all members inside a group and simplifies debts to minimize the total number of cash transactions.
 * **Standalone PWA Mode**: Installs directly onto smartphone home screens (Android & iOS) to run full-screen, hiding browser banners, URL bars, and tabs.
 
